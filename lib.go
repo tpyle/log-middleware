@@ -53,6 +53,20 @@ func init() {
 	logrus.AddHook(&requestIDHook{requestIDKey: requestIDKey})
 }
 
+func GetRequestIdFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if requestId, ok := ctx.Value(requestIDKey).(string); ok {
+		return requestId
+	}
+	return ""
+}
+
+func GetRequestIdFromRequest(r *http.Request) string {
+	return GetRequestIdFromContext(r.Context())
+}
+
 func LogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

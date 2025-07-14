@@ -453,6 +453,113 @@ func TestLogMiddleware_NoLogsWhenLevelAboveDebug(t *testing.T) {
 	}
 }
 
+func TestGetRequestIdFromContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		ctx      context.Context
+		expected string
+	}{
+		{
+			name:     "Valid context with request ID",
+			ctx:      context.WithValue(context.Background(), requestIDKey, "test-request-id-123"),
+			expected: "test-request-id-123",
+		},
+		{
+			name:     "Context without request ID",
+			ctx:      context.Background(),
+			expected: "",
+		},
+		{
+			name:     "Nil context",
+			ctx:      nil,
+			expected: "",
+		},
+		{
+			name:     "Context with wrong type value",
+			ctx:      context.WithValue(context.Background(), requestIDKey, 123),
+			expected: "",
+		},
+		{
+			name:     "Context with different key",
+			ctx:      context.WithValue(context.Background(), "otherKey", "some-value"),
+			expected: "",
+		},
+		{
+			name:     "Context with empty string request ID",
+			ctx:      context.WithValue(context.Background(), requestIDKey, ""),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetRequestIdFromContext(tt.ctx)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetRequestIdFromRequest(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  *http.Request
+		expected string
+	}{
+		{
+			name: "Request with valid context containing request ID",
+			request: func() *http.Request {
+				ctx := context.WithValue(context.Background(), requestIDKey, "test-request-id-456")
+				req := httptest.NewRequest("GET", "/test", nil)
+				return req.WithContext(ctx)
+			}(),
+			expected: "test-request-id-456",
+		},
+		{
+			name: "Request with context but no request ID",
+			request: func() *http.Request {
+				ctx := context.Background()
+				req := httptest.NewRequest("GET", "/test", nil)
+				return req.WithContext(ctx)
+			}(),
+			expected: "",
+		},
+		{
+			name:     "Request with default context",
+			request:  httptest.NewRequest("GET", "/test", nil),
+			expected: "",
+		},
+		{
+			name: "Request with context containing wrong type",
+			request: func() *http.Request {
+				ctx := context.WithValue(context.Background(), requestIDKey, 789)
+				req := httptest.NewRequest("GET", "/test", nil)
+				return req.WithContext(ctx)
+			}(),
+			expected: "",
+		},
+		{
+			name: "Request with context containing empty string",
+			request: func() *http.Request {
+				ctx := context.WithValue(context.Background(), requestIDKey, "")
+				req := httptest.NewRequest("GET", "/test", nil)
+				return req.WithContext(ctx)
+			}(),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetRequestIdFromRequest(tt.request)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
 // Benchmark tests
 func BenchmarkLogMiddleware(b *testing.B) {
 	logrus.SetOutput(io.Discard) // Discard logs for benchmarking
