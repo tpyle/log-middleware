@@ -3,7 +3,6 @@ package logmiddleware
 import (
 	"bytes"
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 func TestResponseWriterWrapper_WriteHeader(t *testing.T) {
@@ -88,105 +87,10 @@ func TestResponseWriterWrapper_Header(t *testing.T) {
 	}
 }
 
-func TestRequestIDHook_Levels(t *testing.T) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	levels := hook.Levels()
-
-	if len(levels) != len(logrus.AllLevels) {
-		t.Errorf("Expected %d levels, got %d", len(logrus.AllLevels), len(levels))
-	}
-
-	for i, level := range levels {
-		if level != logrus.AllLevels[i] {
-			t.Errorf("Expected level %v at index %d, got %v", logrus.AllLevels[i], i, level)
-		}
-	}
-}
-
-func TestRequestIDHook_Fire_WithRequestID(t *testing.T) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	requestID := "test-request-id-123"
-	ctx := context.WithValue(context.Background(), requestIDKey, requestID)
-
-	entry := &logrus.Entry{
-		Context: ctx,
-		Data:    logrus.Fields{},
-	}
-
-	err := hook.Fire(entry)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if entry.Data["requestId"] != requestID {
-		t.Errorf("Expected requestId %s, got %v", requestID, entry.Data["requestId"])
-	}
-}
-
-func TestRequestIDHook_Fire_WithoutRequestID(t *testing.T) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	ctx := context.Background()
-
-	entry := &logrus.Entry{
-		Context: ctx,
-		Data:    logrus.Fields{},
-	}
-
-	err := hook.Fire(entry)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if _, exists := entry.Data["requestId"]; exists {
-		t.Error("Expected no requestId in entry data")
-	}
-}
-
-func TestRequestIDHook_Fire_WithNilContext(t *testing.T) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-
-	entry := &logrus.Entry{
-		Context: nil,
-		Data:    logrus.Fields{},
-	}
-
-	err := hook.Fire(entry)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if _, exists := entry.Data["requestId"]; exists {
-		t.Error("Expected no requestId in entry data when context is nil")
-	}
-}
-
-func TestRequestIDHook_Fire_WithWrongTypeRequestID(t *testing.T) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	ctx := context.WithValue(context.Background(), requestIDKey, 123) // Wrong type
-
-	entry := &logrus.Entry{
-		Context: ctx,
-		Data:    logrus.Fields{},
-	}
-
-	err := hook.Fire(entry)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if _, exists := entry.Data["requestId"]; exists {
-		t.Error("Expected no requestId in entry data when value is wrong type")
-	}
-}
-
 func TestLogMiddleware_Success(t *testing.T) {
 	// Capture log output
 	var buf bytes.Buffer
-	logrus.SetOutput(&buf)
-	logrus.SetLevel(logrus.DebugLevel)
-	defer func() {
-		logrus.SetOutput(io.Discard)
-	}()
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 	// Create a test handler
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -194,8 +98,9 @@ func TestLogMiddleware_Success(t *testing.T) {
 		w.Write([]byte("test response"))
 	})
 
-	// Wrap with middleware
-	middleware := LogMiddleware(testHandler)
+	// Create middleware with zerolog logger
+	logMiddleware := NewLogMiddleware(&logger)
+	middleware := logMiddleware.Handler(testHandler)
 
 	// Create test request
 	req := httptest.NewRequest("GET", "/test", nil)
@@ -226,9 +131,6 @@ func TestLogMiddleware_Success(t *testing.T) {
 
 	// Verify log output contains expected entries
 	logOutput := buf.String()
-	if !strings.Contains(logOutput, "HTTP request received") {
-		t.Error("Expected log to contain 'HTTP request received'")
-	}
 	if !strings.Contains(logOutput, "HTTP response sent") {
 		t.Error("Expected log to contain 'HTTP response sent'")
 	}
@@ -249,17 +151,14 @@ func TestLogMiddleware_DifferentMethods(t *testing.T) {
 	for _, method := range methods {
 		t.Run(method, func(t *testing.T) {
 			var buf bytes.Buffer
-			logrus.SetOutput(&buf)
-			logrus.SetLevel(logrus.DebugLevel)
-			defer func() {
-				logrus.SetOutput(io.Discard)
-			}()
+			logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})
 
-			middleware := LogMiddleware(testHandler)
+			logMiddleware := NewLogMiddleware(&logger)
+			middleware := logMiddleware.Handler(testHandler)
 			req := httptest.NewRequest(method, "/test", nil)
 			recorder := httptest.NewRecorder()
 
@@ -279,17 +178,14 @@ func TestLogMiddleware_DifferentPaths(t *testing.T) {
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
 			var buf bytes.Buffer
-			logrus.SetOutput(&buf)
-			logrus.SetLevel(logrus.DebugLevel)
-			defer func() {
-				logrus.SetOutput(io.Discard)
-			}()
+			logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})
 
-			middleware := LogMiddleware(testHandler)
+			logMiddleware := NewLogMiddleware(&logger)
+			middleware := logMiddleware.Handler(testHandler)
 			req := httptest.NewRequest("GET", path, nil)
 			recorder := httptest.NewRecorder()
 
@@ -316,17 +212,14 @@ func TestLogMiddleware_DifferentStatusCodes(t *testing.T) {
 	for _, statusCode := range statusCodes {
 		t.Run(http.StatusText(statusCode), func(t *testing.T) {
 			var buf bytes.Buffer
-			logrus.SetOutput(&buf)
-			logrus.SetLevel(logrus.DebugLevel)
-			defer func() {
-				logrus.SetOutput(io.Discard)
-			}()
+			logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(statusCode)
 			})
 
-			middleware := LogMiddleware(testHandler)
+			logMiddleware := NewLogMiddleware(&logger)
+			middleware := logMiddleware.Handler(testHandler)
 			req := httptest.NewRequest("GET", "/test", nil)
 			recorder := httptest.NewRecorder()
 
@@ -344,13 +237,11 @@ func TestLogMiddleware_DifferentStatusCodes(t *testing.T) {
 	}
 }
 
+type testContextKey string
+
 func TestLogMiddleware_WithExistingContext(t *testing.T) {
 	var buf bytes.Buffer
-	logrus.SetOutput(&buf)
-	logrus.SetLevel(logrus.DebugLevel)
-	defer func() {
-		logrus.SetOutput(io.Discard)
-	}()
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify the request has the context with request ID
@@ -360,10 +251,11 @@ func TestLogMiddleware_WithExistingContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := LogMiddleware(testHandler)
+	logMiddleware := NewLogMiddleware(&logger)
+	middleware := logMiddleware.Handler(testHandler)
 
 	// Create request with existing context
-	ctx := context.WithValue(context.Background(), "existing", "value")
+	ctx := context.WithValue(context.Background(), testContextKey("existing"), "value")
 	req := httptest.NewRequest("GET", "/test", nil).WithContext(ctx)
 	recorder := httptest.NewRecorder()
 
@@ -377,11 +269,7 @@ func TestLogMiddleware_WithExistingContext(t *testing.T) {
 
 func TestLogMiddleware_TimingMeasurement(t *testing.T) {
 	var buf bytes.Buffer
-	logrus.SetOutput(&buf)
-	logrus.SetLevel(logrus.DebugLevel)
-	defer func() {
-		logrus.SetOutput(io.Discard)
-	}()
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulate some processing time
@@ -389,7 +277,8 @@ func TestLogMiddleware_TimingMeasurement(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := LogMiddleware(testHandler)
+	logMiddleware := NewLogMiddleware(&logger)
+	middleware := logMiddleware.Handler(testHandler)
 	req := httptest.NewRequest("GET", "/test", nil)
 	recorder := httptest.NewRecorder()
 
@@ -403,17 +292,14 @@ func TestLogMiddleware_TimingMeasurement(t *testing.T) {
 
 func TestLogMiddleware_HandlerPanic(t *testing.T) {
 	var buf bytes.Buffer
-	logrus.SetOutput(&buf)
-	logrus.SetLevel(logrus.DebugLevel)
-	defer func() {
-		logrus.SetOutput(io.Discard)
-	}()
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
 	})
 
-	middleware := LogMiddleware(testHandler)
+	logMiddleware := NewLogMiddleware(&logger)
+	middleware := logMiddleware.Handler(testHandler)
 	req := httptest.NewRequest("GET", "/test", nil)
 	recorder := httptest.NewRecorder()
 
@@ -429,26 +315,21 @@ func TestLogMiddleware_HandlerPanic(t *testing.T) {
 
 func TestLogMiddleware_NoLogsWhenLevelAboveDebug(t *testing.T) {
 	var buf bytes.Buffer
-	originalLevel := logrus.GetLevel()
-	logrus.SetOutput(&buf)
-	logrus.SetLevel(logrus.InfoLevel) // Above debug level
-	defer func() {
-		logrus.SetOutput(io.Discard)
-		logrus.SetLevel(originalLevel)
-	}()
+	logger := zerolog.New(&buf).Level(zerolog.InfoLevel) // Above debug level
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := LogMiddleware(testHandler)
+	logMiddleware := NewLogMiddleware(&logger)
+	middleware := logMiddleware.Handler(testHandler)
 	req := httptest.NewRequest("GET", "/test", nil)
 	recorder := httptest.NewRecorder()
 
 	middleware.ServeHTTP(recorder, req)
 
 	logOutput := buf.String()
-	if strings.Contains(logOutput, "HTTP request received") || strings.Contains(logOutput, "HTTP response sent") {
+	if strings.Contains(logOutput, "HTTP response sent") {
 		t.Error("Expected no debug logs when log level is above debug")
 	}
 }
@@ -562,39 +443,20 @@ func TestGetRequestIdFromRequest(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkLogMiddleware(b *testing.B) {
-	logrus.SetOutput(io.Discard) // Discard logs for benchmarking
-	defer func() {
-		logrus.SetOutput(io.Discard)
-	}()
+	logger := zerolog.Nop() // No-op logger for benchmarking
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	middleware := LogMiddleware(testHandler)
+	logMiddleware := NewLogMiddleware(&logger)
+	middleware := logMiddleware.Handler(testHandler)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest("GET", "/test", nil)
 		recorder := httptest.NewRecorder()
 		middleware.ServeHTTP(recorder, req)
-	}
-}
-
-func BenchmarkRequestIDHook_Fire(b *testing.B) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	requestID := "test-request-id-123"
-	ctx := context.WithValue(context.Background(), requestIDKey, requestID)
-
-	entry := &logrus.Entry{
-		Context: ctx,
-		Data:    logrus.Fields{},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		entry.Data = logrus.Fields{} // Reset data
-		hook.Fire(entry)
 	}
 }

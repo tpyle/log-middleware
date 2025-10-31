@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 type responseWriterWrapper struct {
@@ -28,29 +28,12 @@ const (
 	requestIDKey logRequestIdKey = "requestId"
 )
 
-type requestIDHook struct {
-	requestIDKey logRequestIdKey
+type LogMiddleware struct {
+	logger *zerolog.Logger
 }
 
-func (h *requestIDHook) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (h *requestIDHook) Fire(entry *logrus.Entry) error {
-	ctx := entry.Context
-	if ctx != nil {
-		if requestID, ok := ctx.Value(h.requestIDKey).(string); ok {
-			if entry.Data == nil {
-				entry.Data = logrus.Fields{}
-			}
-			entry.Data["requestId"] = requestID
-		}
-	}
-	return nil
-}
-
-func init() {
-	logrus.AddHook(&requestIDHook{requestIDKey: requestIDKey})
+func NewLogMiddleware(logger *zerolog.Logger) *LogMiddleware {
+	return &LogMiddleware{logger: logger}
 }
 
 func GetRequestIdFromContext(ctx context.Context) string {
@@ -67,17 +50,18 @@ func GetRequestIdFromRequest(r *http.Request) string {
 	return GetRequestIdFromContext(r.Context())
 }
 
-func LogMiddleware(next http.Handler) http.Handler {
+func (lm *LogMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		requestId := uuid.New().String()
 
 		ctx := context.WithValue(r.Context(), requestIDKey, requestId)
 
-		logrus.WithContext(ctx).WithFields(logrus.Fields{
-			"method": r.Method,
-			"path":   r.URL.Path,
-		}).Debug("HTTP request received")
+		logger := lm.logger.With().Str("requestId", requestId).
+			Str("method", r.Method).
+			Str("path", r.URL.Path).
+			Logger()
+		ctx = logger.WithContext(ctx)
 
 		wrapper := &responseWriterWrapper{
 			ResponseWriter: w,
@@ -87,11 +71,9 @@ func LogMiddleware(next http.Handler) http.Handler {
 		wrapper.Header().Add("X-Request-Id", requestId)
 		next.ServeHTTP(wrapper, r.WithContext(ctx))
 
-		logrus.WithContext(ctx).WithFields(logrus.Fields{
-			"method":     r.Method,
-			"path":       r.URL.Path,
-			"statusCode": wrapper.statusCode,
-			"duration":   time.Since(start),
-		}).Debug("HTTP response sent")
+		logger.Debug().
+			Int("statusCode", wrapper.statusCode).
+			Dur("duration", time.Since(start)).
+			Msg("HTTP response sent")
 	})
 }

@@ -1,83 +1,71 @@
 package logmiddleware
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
-
-// Test the init function behavior
-func TestInit(t *testing.T) {
-	// Save original hooks
-	originalHooks := logrus.StandardLogger().Hooks
-
-	// Clear hooks to test init
-	logrus.StandardLogger().Hooks = make(logrus.LevelHooks)
-
-	// Re-run init (simulate package initialization)
-	logrus.AddHook(&requestIDHook{requestIDKey: requestIDKey})
-
-	// Verify hook was added
-	if len(logrus.StandardLogger().Hooks) == 0 {
-		t.Error("Expected hook to be added to logrus")
-	}
-
-	// Check if our hook exists in all levels
-	for _, level := range logrus.AllLevels {
-		found := false
-		for _, hook := range logrus.StandardLogger().Hooks[level] {
-			if _, ok := hook.(*requestIDHook); ok {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected requestIDHook to be registered for level %v", level)
-		}
-	}
-
-	// Restore original hooks
-	logrus.StandardLogger().Hooks = originalHooks
-}
 
 // Test request ID key type safety
 func TestRequestIDKeyType(t *testing.T) {
 	// Test that different key types don't interfere
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "requestId", "string-key-value")         // string key
-	ctx = context.WithValue(ctx, requestIDKey, "typed-key-value")         // typed key
+	ctx = context.WithValue(ctx, requestIDKey, "typed-key-value")         // typed key (will be overridden)
 	ctx = context.WithValue(ctx, logRequestIdKey("other"), "other-value") // different typed key
 
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	entry := &logrus.Entry{
-		Context: ctx,
-		Data:    logrus.Fields{},
-	}
+	// Create a logger and middleware
+	var buf bytes.Buffer
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
+	logMiddleware := NewLogMiddleware(&logger)
 
-	err := hook.Fire(entry)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the middleware generated its own request ID (overriding the existing one)
+		if requestID := r.Context().Value(requestIDKey); requestID != nil {
+			requestIDStr := requestID.(string)
+			// Should be a new UUID, not the pre-existing value
+			if requestIDStr == "typed-key-value" {
+				t.Error("Expected middleware to generate a new request ID, not use the existing one")
+			}
+			// Should be a valid UUID
+			if len(requestIDStr) == 0 {
+				t.Error("Expected non-empty request ID")
+			}
+		} else {
+			t.Error("Expected request context to contain request ID")
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 
-	// Should only get the typed key value
-	if entry.Data["requestId"] != "typed-key-value" {
-		t.Errorf("Expected 'typed-key-value', got %v", entry.Data["requestId"])
+	middleware := logMiddleware.Handler(testHandler)
+	req := httptest.NewRequest("GET", "/test", nil).WithContext(ctx)
+	recorder := httptest.NewRecorder()
+
+	middleware.ServeHTTP(recorder, req)
+
+	// The middleware should have worked correctly
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", recorder.Code)
 	}
 }
 
 // Test concurrent access to middleware
 func TestLogMiddleware_Concurrent(t *testing.T) {
+	logger := zerolog.Nop() // Use no-op logger for performance
+	logMiddleware := NewLogMiddleware(&logger)
+
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Context().Value(requestIDKey).(string)
 		w.Header().Set("Test-Request-ID", requestID)
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := LogMiddleware(testHandler)
+	middleware := logMiddleware.Handler(testHandler)
 
 	// Run multiple requests concurrently
 	const numRequests = 100
@@ -112,11 +100,14 @@ func TestLogMiddleware_Concurrent(t *testing.T) {
 
 // Test middleware with malformed requests
 func TestLogMiddleware_MalformedRequests(t *testing.T) {
+	logger := zerolog.Nop() // Use no-op logger for performance
+	logMiddleware := NewLogMiddleware(&logger)
+
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := LogMiddleware(testHandler)
+	middleware := logMiddleware.Handler(testHandler)
 
 	tests := []struct {
 		name   string
@@ -240,6 +231,8 @@ func TestResponseWriterWrapper_EdgeCases(t *testing.T) {
 
 // Test context inheritance and isolation
 func TestLogMiddleware_ContextIsolation(t *testing.T) {
+	logger := zerolog.Nop() // Use no-op logger for performance
+	logMiddleware := NewLogMiddleware(&logger)
 	var capturedContexts []context.Context
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +240,7 @@ func TestLogMiddleware_ContextIsolation(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := LogMiddleware(testHandler)
+	middleware := logMiddleware.Handler(testHandler)
 
 	// Make multiple requests
 	for i := 0; i < 3; i++ {
@@ -277,30 +270,5 @@ func TestLogMiddleware_ContextIsolation(t *testing.T) {
 				t.Errorf("Duplicate request ID: %s", requestIDs[i])
 			}
 		}
-	}
-}
-
-// Test hook with entry that has no Data field initialized
-func TestRequestIDHook_Fire_NilData(t *testing.T) {
-	hook := &requestIDHook{requestIDKey: requestIDKey}
-	requestID := "test-request-id"
-	ctx := context.WithValue(context.Background(), requestIDKey, requestID)
-
-	entry := &logrus.Entry{
-		Context: ctx,
-		Data:    nil, // nil data
-	}
-
-	// Should not panic
-	err := hook.Fire(entry)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	// Data should be initialized and contain requestId
-	if entry.Data == nil {
-		t.Error("Expected Data to be initialized")
-	} else if entry.Data["requestId"] != requestID {
-		t.Errorf("Expected requestId %s, got %v", requestID, entry.Data["requestId"])
 	}
 }
