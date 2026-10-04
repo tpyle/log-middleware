@@ -8,6 +8,9 @@ on:
     branches:
       - trunk
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,14 +24,16 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install dependencies
-        run: go mod tidy
+      - name: Check go.mod and go.sum are tidy
+        run: go mod tidy -diff
 
-      - name: Run tests
-        run: go test ./...
-
-      - name: Run lint
+      - name: Vet
         run: go vet ./...
 
-      - name: Run coverage
-        run: go test -coverprofile=coverage.out ./...
+      - name: Test
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
