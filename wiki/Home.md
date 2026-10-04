@@ -8,15 +8,15 @@
 - logs every completed response at debug level with its status code and duration.
 
 The core module has no dependencies outside the standard library and logs with
-`log/slog`. zerolog and logrus are supported through adapter modules, which are
-versioned separately. zerolog and logrus show up in your `go.mod`, binary and
+`log/slog`. zerolog and logrus are supported through adapter modules that are
+released together with the core under the same version number. zerolog and logrus show up in your `go.mod`, binary and
 SBOM only if you add the adapter.
 
 | Logger | Import | Constructor | Get the logger in a handler |
 |--------|--------|-------------|-----------------------------|
 | `log/slog` | `github.com/tpyle/log-middleware/v3` | `logmiddleware.NewSlog(l)` | `logmiddleware.SlogFromContext(ctx)` |
-| zerolog | `github.com/tpyle/log-middleware/v3/zerologmw` | `zerologmw.New(&l)` | `zerolog.Ctx(ctx)` |
-| logrus | `github.com/tpyle/log-middleware/v3/logrusmw` | `logrusmw.New(l)` | `logrusmw.FromContext(ctx)` |
+| zerolog | `github.com/tpyle/log-middleware/zerologmw/v3` | `zerologmw.New(&l)` | `zerolog.Ctx(ctx)` |
+| logrus | `github.com/tpyle/log-middleware/logrusmw/v3` | `logrusmw.New(l)` | `logrusmw.FromContext(ctx)` |
 | anything else | `github.com/tpyle/log-middleware/v3` | `logmiddleware.New(yourLogger)` | your choice |
 
 ## Pages

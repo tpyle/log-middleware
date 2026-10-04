@@ -7,8 +7,8 @@
 // are separate modules, so those loggers only enter the dependency graph of
 // programs that use them:
 //
-//   - github.com/tpyle/log-middleware/v3/zerologmw for zerolog
-//   - github.com/tpyle/log-middleware/v3/logrusmw for logrus
+//   - github.com/tpyle/log-middleware/zerologmw/v3 for zerolog
+//   - github.com/tpyle/log-middleware/logrusmw/v3 for logrus
 //
 // Any other logger can be supported by implementing [Logger].
 package logmiddleware

@@ -15,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 
 	logmiddleware "github.com/tpyle/log-middleware/v3"
-	"github.com/tpyle/log-middleware/v3/zerologmw"
+	"github.com/tpyle/log-middleware/zerologmw/v3"
 )
 
 func main() {

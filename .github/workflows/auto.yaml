@@ -21,8 +21,8 @@ jobs:
         # Every Go module in the repository. Keep in sync with dependabot.yml.
         module:
           - .
-          - v3/zerologmw
-          - v3/logrusmw
+          - zerologmw
+          - logrusmw
           - examples
     defaults:
       run:

@@ -14,8 +14,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/tpyle/log-middleware/logrusmw/v3"
 	logmiddleware "github.com/tpyle/log-middleware/v3"
-	"github.com/tpyle/log-middleware/v3/logrusmw"
 )
 
 func main() {

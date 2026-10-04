@@ -7,8 +7,8 @@ updates:
   - package-ecosystem: "gomod"
     directories:
       - "/"
-      - "/v3/zerologmw"
-      - "/v3/logrusmw"
+      - "/zerologmw"
+      - "/logrusmw"
       - "/examples"
     schedule:
       interval: "weekly"

@@ -1,4 +1,4 @@
-module github.com/tpyle/log-middleware/v3/zerologmw
+module github.com/tpyle/log-middleware/zerologmw/v3
 
 go 1.27.0
 
@@ -15,4 +15,4 @@ require (
 
 // Builds in this repository use the local core module. Consumers ignore this
 // directive and use the required version above.
-replace github.com/tpyle/log-middleware/v3 => ../..
+replace github.com/tpyle/log-middleware/v3 => ../
