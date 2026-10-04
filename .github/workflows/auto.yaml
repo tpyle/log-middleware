@@ -14,7 +14,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Test and Lint (${{ matrix.module }})
+    name: Test (${{ matrix.module }})
     strategy:
       fail-fast: false
       matrix:
@@ -51,3 +51,20 @@ jobs:
         with:
           version: v2.14.0
           working-directory: ${{ matrix.module }}
+
+  # The trunk ruleset requires a check named "Test and Lint". This job reports
+  # the combined result of the per-module jobs under that name, so the ruleset
+  # doesn't need to change when modules are added. It runs even when a module
+  # job fails, because a skipped required check would count as passing.
+  result:
+    runs-on: ubuntu-latest
+    name: Test and Lint
+    needs: test
+    if: always()
+    steps:
+      - name: Check all modules passed
+        env:
+          RESULT: ${{ needs.test.result }}
+        run: |
+          echo "Module jobs: $RESULT"
+          test "$RESULT" = "success"
