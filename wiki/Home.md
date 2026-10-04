@@ -7,9 +7,10 @@
 - stores the ID and a request-scoped logger in the request context, and
 - logs every completed response at debug level with its status code and duration.
 
-The core package depends only on the standard library and logs with `log/slog`.
-zerolog and logrus are supported through adapter subpackages. Their dependencies
-are compiled into your program only if you import the adapter.
+The core module has no dependencies outside the standard library and logs with
+`log/slog`. zerolog and logrus are supported through adapter modules, which are
+versioned separately. zerolog and logrus show up in your `go.mod`, binary and
+SBOM only if you add the adapter.
 
 | Logger | Import | Constructor | Get the logger in a handler |
 |--------|--------|-------------|-----------------------------|

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // fakeLogger records every call so tests can assert on what the middleware
@@ -73,8 +73,12 @@ func TestNew_NilOptionsKeepDefaults(t *testing.T) {
 	if lm.newRequestID == nil || lm.now == nil {
 		t.Fatal("nil options should not clear defaults")
 	}
-	if _, err := uuid.Parse(lm.newRequestID()); err != nil {
+	id := lm.newRequestID()
+	if _, err := uuid.Parse(id); err != nil {
 		t.Errorf("default generator should produce a UUID: %v", err)
+	}
+	if len(id) != 36 || id[14] != '4' {
+		t.Errorf("default generator should produce a version 4 UUID, got %q", id)
 	}
 }
 

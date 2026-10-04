@@ -4,8 +4,8 @@
 //
 // The package depends only on the standard library and logs through
 // [log/slog] out of the box (see [NewSlog]). Adapters for third-party loggers
-// live in subpackages so their dependencies are only compiled into programs
-// that import them:
+// are separate modules, so those loggers only enter the dependency graph of
+// programs that use them:
 //
 //   - github.com/tpyle/log-middleware/v3/zerologmw for zerolog
 //   - github.com/tpyle/log-middleware/v3/logrusmw for logrus
@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // RequestIDHeader is the response header the middleware sets to the request ID.
@@ -78,7 +78,7 @@ type RequestLogger interface {
 }
 
 // LogMiddleware wraps HTTP handlers with request logging. Create one with
-// [New], [NewSlog], or a constructor from an adapter subpackage.
+// [New], [NewSlog], or a constructor from an adapter module.
 type LogMiddleware struct {
 	logger       Logger
 	newRequestID func() string
@@ -116,7 +116,7 @@ func New(logger Logger, opts ...Option) *LogMiddleware {
 	}
 	lm := &LogMiddleware{
 		logger:       logger,
-		newRequestID: func() string { return uuid.New().String() },
+		newRequestID: func() string { return uuid.NewV4().String() },
 		now:          time.Now,
 	}
 	for _, opt := range opts {

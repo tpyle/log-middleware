@@ -4,19 +4,23 @@ HTTP middleware for Go that gives every request a unique ID, attaches a
 request-scoped logger to the request context, and logs each response with its
 status code and duration.
 
-The core package depends only on the standard library and logs with
+The core module depends only on the standard library and logs with
 [`log/slog`](https://pkg.go.dev/log/slog). Adapters for
 [zerolog](https://github.com/rs/zerolog) and
-[logrus](https://github.com/sirupsen/logrus) live in subpackages, so those
-libraries are only compiled into your program if you import the adapter.
+[logrus](https://github.com/sirupsen/logrus) are separate Go modules, so those
+libraries only appear in your `go.mod`, build and SBOM if you use the adapter.
 
 ## Install
 
 ```bash
 go get github.com/tpyle/log-middleware/v3
+
+# only if you use them:
+go get github.com/tpyle/log-middleware/v3/zerologmw
+go get github.com/tpyle/log-middleware/v3/logrusmw
 ```
 
-Requires Go 1.26+. v2 (zerolog only) and v1 (logrus only) remain available at
+Requires Go 1.27+. v2 (zerolog only) and v1 (logrus only) remain available at
 `github.com/tpyle/log-middleware/v2` and `github.com/tpyle/log-middleware`.
 
 ## Usage
@@ -102,11 +106,29 @@ The middleware logs one line per request, at **debug** level:
 
 ## Development
 
+The repository contains four Go modules: the core (repository root),
+`v3/zerologmw`, `v3/logrusmw` and `examples`. The adapters live under `v3/` so
+their import paths match the core module's `/v3` path. Each nested module uses
+a `replace` directive to build against the local core, so changes can be made
+and tested across modules together. Run checks in each module:
+
 ```bash
-go test -race -cover ./...
-go test -bench=. ./...
-golangci-lint run ./...
+for m in . v3/zerologmw v3/logrusmw examples; do
+  (cd $m && go mod tidy -diff && go vet ./... && go test -race -cover ./... && golangci-lint run ./...)
+done
 ```
+
+### Releasing
+
+The core and the adapters are tagged separately. Adapter tags carry their
+directory as a prefix and use their own v1 version line:
+
+1. In each adapter's `go.mod`, set the required core version to the core
+   version being released, and in `examples/go.mod` the adapter versions too.
+2. After merging, tag the same commit: `vX.Y.Z` for the core and
+   `v3/zerologmw/vA.B.C` / `v3/logrusmw/vA.B.C` for any adapters that changed.
+3. Push the tags, then check from a scratch module that
+   `go get github.com/tpyle/log-middleware/v3/zerologmw@vA.B.C` resolves.
 
 ## License
 

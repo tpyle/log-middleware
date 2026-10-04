@@ -1,5 +1,9 @@
 # Using logrus
 
+```bash
+go get github.com/tpyle/log-middleware/v3/logrusmw
+```
+
 ```go
 import (
     "github.com/sirupsen/logrus"

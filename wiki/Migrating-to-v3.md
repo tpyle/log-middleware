@@ -2,7 +2,7 @@
 
 v3 moves logger support out of the core package so that it no longer requires
 zerolog. The core package now uses `log/slog`, and zerolog moved to an adapter
-subpackage.
+module.
 
 ## From v2 (zerolog)
 
@@ -25,7 +25,23 @@ Nothing else changes for handlers. `zerolog.Ctx(r.Context())`,
 - The `X-Request-Id` header is now set with `Set` instead of `Add`.
 - The wrapped `ResponseWriter` now supports `http.Flusher` and
   `http.ResponseController`.
-- The minimum Go version is now 1.26.
+- The minimum Go version is 1.27 as of v3.1.0 (1.26 for v3.0.0).
+
+## Upgrading from v3.0.0 to v3.1.0
+
+In v3.1.0, `zerologmw` and `logrusmw` became separate Go modules, so zerolog
+and logrus no longer appear in the dependency graph of programs that don't use
+them. Import paths are unchanged. If you use an adapter, run `go mod tidy`
+after upgrading. It adds the adapter's own module to your `go.mod`:
+
+```bash
+go get github.com/tpyle/log-middleware/v3@v3.1.0
+go mod tidy
+```
+
+The core module no longer depends on `github.com/google/uuid`. Request IDs
+are still random version 4 UUIDs, now generated with the standard library's
+`uuid` package, which is why Go 1.27 is required.
 
 ## From v1 (logrus)
 

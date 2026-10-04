@@ -1,5 +1,9 @@
 # Using zerolog
 
+```bash
+go get github.com/tpyle/log-middleware/v3/zerologmw
+```
+
 ```go
 import (
     "github.com/rs/zerolog"
