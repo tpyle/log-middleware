@@ -1,9 +1,13 @@
 # Using zerolog
 
+```bash
+go get github.com/tpyle/log-middleware/zerologmw/v3
+```
+
 ```go
 import (
     "github.com/rs/zerolog"
-    "github.com/tpyle/log-middleware/v3/zerologmw"
+    "github.com/tpyle/log-middleware/zerologmw/v3"
 )
 
 logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Timestamp().Logger()

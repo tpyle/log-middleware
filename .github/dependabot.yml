@@ -3,11 +3,19 @@
 
 version: 2
 updates:
-  # Covers the whole module, including the zerologmw and logrusmw packages.
+  # Every Go module in the repository. Keep in sync with the CI matrix.
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/"
+      - "/zerologmw"
+      - "/logrusmw"
+      - "/examples"
     schedule:
       interval: "weekly"
+    ignore:
+      # Modules from this repository are replaced with local paths, and their
+      # required versions are set by hand at release time.
+      - dependency-name: "github.com/tpyle/log-middleware/*"
     groups:
       go-dependencies:
         patterns:

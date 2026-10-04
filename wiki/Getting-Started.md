@@ -6,7 +6,15 @@
 go get github.com/tpyle/log-middleware/v3
 ```
 
-v3 requires Go 1.26 or newer.
+For zerolog or logrus, also add the adapter. Each adapter is its own Go
+module, so these loggers never enter your dependency graph unless you use them:
+
+```bash
+go get github.com/tpyle/log-middleware/zerologmw/v3
+go get github.com/tpyle/log-middleware/logrusmw/v3
+```
+
+v3 requires Go 1.27 or newer.
 
 ## Minimal server (slog)
 

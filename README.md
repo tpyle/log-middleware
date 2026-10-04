@@ -4,19 +4,23 @@ HTTP middleware for Go that gives every request a unique ID, attaches a
 request-scoped logger to the request context, and logs each response with its
 status code and duration.
 
-The core package depends only on the standard library and logs with
+The core module depends only on the standard library and logs with
 [`log/slog`](https://pkg.go.dev/log/slog). Adapters for
 [zerolog](https://github.com/rs/zerolog) and
-[logrus](https://github.com/sirupsen/logrus) live in subpackages, so those
-libraries are only compiled into your program if you import the adapter.
+[logrus](https://github.com/sirupsen/logrus) are separate Go modules, so those
+libraries only appear in your `go.mod`, build and SBOM if you use the adapter.
 
 ## Install
 
 ```bash
 go get github.com/tpyle/log-middleware/v3
+
+# only if you use them:
+go get github.com/tpyle/log-middleware/zerologmw/v3
+go get github.com/tpyle/log-middleware/logrusmw/v3
 ```
 
-Requires Go 1.26+. v2 (zerolog only) and v1 (logrus only) remain available at
+Requires Go 1.27+. v2 (zerolog only) and v1 (logrus only) remain available at
 `github.com/tpyle/log-middleware/v2` and `github.com/tpyle/log-middleware`.
 
 ## Usage
@@ -39,7 +43,7 @@ http.ListenAndServe(":8080", mw.Handler(mux))
 ### zerolog
 
 ```go
-import "github.com/tpyle/log-middleware/v3/zerologmw"
+import "github.com/tpyle/log-middleware/zerologmw/v3"
 
 logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 mw := zerologmw.New(&logger)
@@ -49,7 +53,7 @@ mw := zerologmw.New(&logger)
 ### logrus
 
 ```go
-import "github.com/tpyle/log-middleware/v3/logrusmw"
+import "github.com/tpyle/log-middleware/logrusmw/v3"
 
 logger := logrus.New()
 logger.SetLevel(logrus.DebugLevel)
@@ -102,11 +106,33 @@ The middleware logs one line per request, at **debug** level:
 
 ## Development
 
+The repository contains four Go modules: the core (repository root),
+`zerologmw`, `logrusmw` and `examples`. Each nested module uses `replace`
+directives to build against the local code, so changes can be made and tested
+across modules together. Run checks in each module:
+
 ```bash
-go test -race -cover ./...
-go test -bench=. ./...
-golangci-lint run ./...
+for m in . zerologmw logrusmw examples; do
+  (cd $m && go mod tidy -diff && go vet ./... && go test -race -cover ./... && golangci-lint run ./...)
+done
 ```
+
+### Releasing
+
+The core and both adapters are always released together with the same
+version number. Go versions each module by its own tags, so a release is three
+tags on the same commit:
+
+1. Set the new version in the `require` lines for this repository's modules in
+   `zerologmw/go.mod`, `logrusmw/go.mod` and `examples/go.mod`, and merge.
+2. Tag the merge commit and push the tags:
+   ```bash
+   V=vX.Y.Z
+   git tag -a $V -m $V && git tag -a zerologmw/$V -m $V && git tag -a logrusmw/$V -m $V
+   git push origin $V zerologmw/$V logrusmw/$V
+   ```
+3. Check from a scratch module that
+   `go get github.com/tpyle/log-middleware/zerologmw/v3@$V` resolves.
 
 ## License
 

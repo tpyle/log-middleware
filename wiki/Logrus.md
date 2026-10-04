@@ -1,9 +1,13 @@
 # Using logrus
 
+```bash
+go get github.com/tpyle/log-middleware/logrusmw/v3
+```
+
 ```go
 import (
     "github.com/sirupsen/logrus"
-    "github.com/tpyle/log-middleware/v3/logrusmw"
+    "github.com/tpyle/log-middleware/logrusmw/v3"
 )
 
 logger := logrus.New()
