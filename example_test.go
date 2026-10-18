@@ -84,3 +84,46 @@ func ExampleNewContextHandler() {
 	// level=INFO msg="loading user" userId=42 requestId=req-1 method=GET path=/users/42
 	// level=DEBUG msg="HTTP response sent" requestId=req-1 method=GET path=/users/42 statusCode=200
 }
+
+func ExampleWithRequestIDFromRequest() {
+	// Use the first character of the path as the ID. Any function of the
+	// request works; see RequestIDFromHeader for reusing an incoming header.
+	byPath := logmiddleware.RequestIDGeneratorFunc(func(r *http.Request) string {
+		return "path-" + r.URL.Path[1:2]
+	})
+
+	mw := logmiddleware.NewSlog(exampleSlog(), logmiddleware.WithRequestIDFromRequest(byPath))
+	handler := mw.Handler(http.NotFoundHandler())
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/abc", nil))
+	// Output:
+	// level=DEBUG msg="HTTP response sent" requestId=path-a method=GET path=/abc statusCode=404
+}
+
+func ExampleRequestIDFromHeader() {
+	// Reuse a valid X-Request-Id from an upstream proxy; otherwise use the
+	// fallback (here a fixed value; use UUIDRequestID in real code).
+	gen := logmiddleware.RequestIDFromHeader(logmiddleware.RequestIDHeader,
+		logmiddleware.RequestIDGeneratorFunc(func(*http.Request) string { return "generated" }))
+
+	mw := logmiddleware.NewSlog(exampleSlog(), logmiddleware.WithRequestIDFromRequest(gen))
+	handler := mw.Handler(http.NotFoundHandler())
+
+	for _, incoming := range []string{"from-proxy", "bad id\nlevel=ERROR"} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(logmiddleware.RequestIDHeader, incoming)
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	// Output:
+	// level=DEBUG msg="HTTP response sent" requestId=from-proxy method=GET path=/ statusCode=404
+	// level=DEBUG msg="HTTP response sent" requestId=generated method=GET path=/ statusCode=404
+}
+
+func ExampleValidRequestID() {
+	for _, id := range []string{"0f8fad5b-d9cb-469f-a165-70867728950e", "a b", ""} {
+		fmt.Printf("%q %v\n", id, logmiddleware.ValidRequestID(id))
+	}
+	// Output:
+	// "0f8fad5b-d9cb-469f-a165-70867728950e" true
+	// "a b" false
+	// "" false
+}

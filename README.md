@@ -87,6 +87,17 @@ id := logmiddleware.GetRequestIdFromRequest(r)   // or GetRequestIdFromContext(c
 ```
 
 The ID is also returned to the client in the `X-Request-Id` response header.
+IDs are random UUIDs by default. To reuse a valid incoming `X-Request-Id` from
+an upstream proxy:
+
+```go
+ids := logmiddleware.RequestIDFromHeader(logmiddleware.RequestIDHeader,
+    logmiddleware.RequestIDGeneratorFunc(logmiddleware.UUIDRequestID))
+mw := logmiddleware.NewSlog(logger, logmiddleware.WithRequestIDFromRequest(ids))
+```
+
+`WithRequestIDFromRequest` accepts any `RequestIDGenerator`. See
+[wiki/Configuration.md](wiki/Configuration.md#custom-request-ids).
 
 ## Output
 
@@ -100,8 +111,8 @@ The middleware logs one line per request, at **debug** level:
 
 - [wiki/](wiki/Home.md): guides for each logger, configuration, and migration
   from v1 and v2 ([Migrating to v3](wiki/Migrating-to-v3.md))
-- [examples/](examples/): runnable servers for slog, zerolog, logrus and a
-  custom logger (`go run ./examples/slog`)
+- [examples/](examples/): runnable servers for slog, zerolog, logrus, a
+  custom logger and custom request IDs (`go run ./examples/slog`)
 - API reference: <https://pkg.go.dev/github.com/tpyle/log-middleware/v3>
 
 ## Development
