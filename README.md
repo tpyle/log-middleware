@@ -1,6 +1,6 @@
 # Go Log Middleware v3
 
-HTTP middleware for Go that gives every request a unique ID, attaches a
+HTTP middleware for Go that gives every request an ID, attaches a
 request-scoped logger to the request context, and logs each response with its
 status code and duration.
 
@@ -87,6 +87,18 @@ id := logmiddleware.GetRequestIdFromRequest(r)   // or GetRequestIdFromContext(c
 ```
 
 The ID is also returned to the client in the `X-Request-Id` response header.
+IDs are random UUIDs by default. To reuse a valid incoming `X-Request-Id` set
+by a proxy you control (the proxy must strip or overwrite any value sent by
+clients, or clients can choose their own IDs):
+
+```go
+ids := logmiddleware.RequestIDFromHeader(logmiddleware.RequestIDHeader,
+    logmiddleware.RequestIDGeneratorFunc(logmiddleware.UUIDRequestID))
+mw := logmiddleware.NewSlog(logger, logmiddleware.WithRequestIDFromRequest(ids))
+```
+
+`WithRequestIDFromRequest` accepts any `RequestIDGenerator`. See
+[wiki/Configuration.md](wiki/Configuration.md#custom-request-ids).
 
 ## Output
 
@@ -100,8 +112,8 @@ The middleware logs one line per request, at **debug** level:
 
 - [wiki/](wiki/Home.md): guides for each logger, configuration, and migration
   from v1 and v2 ([Migrating to v3](wiki/Migrating-to-v3.md))
-- [examples/](examples/): runnable servers for slog, zerolog, logrus and a
-  custom logger (`go run ./examples/slog`)
+- [examples/](examples/): runnable servers for slog, zerolog, logrus, a
+  custom logger and custom request IDs (`go run ./examples/slog`)
 - API reference: <https://pkg.go.dev/github.com/tpyle/log-middleware/v3>
 
 ## Development

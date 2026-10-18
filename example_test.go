@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 
 	logmiddleware "github.com/tpyle/log-middleware/v3"
 )
@@ -83,4 +84,50 @@ func ExampleNewContextHandler() {
 	// Output:
 	// level=INFO msg="loading user" userId=42 requestId=req-1 method=GET path=/users/42
 	// level=DEBUG msg="HTTP response sent" requestId=req-1 method=GET path=/users/42 statusCode=200
+}
+
+func ExampleWithRequestIDFromRequest() {
+	// Prefix a random UUID with the HTTP method. Any function of the request
+	// works; see RequestIDFromHeader for reusing an incoming header.
+	byMethod := logmiddleware.RequestIDGeneratorFunc(func(r *http.Request) string {
+		return strings.ToLower(r.Method) + "-" + logmiddleware.UUIDRequestID(r)
+	})
+
+	mw := logmiddleware.NewSlog(slog.New(slog.DiscardHandler), logmiddleware.WithRequestIDFromRequest(byMethod))
+	handler := mw.Handler(http.NotFoundHandler())
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	fmt.Println(strings.HasPrefix(rec.Header().Get(logmiddleware.RequestIDHeader), "get-"))
+	// Output:
+	// true
+}
+
+func ExampleRequestIDFromHeader() {
+	// Reuse a valid X-Request-Id from an upstream proxy; otherwise use the
+	// fallback (here a fixed value; use UUIDRequestID in real code).
+	gen := logmiddleware.RequestIDFromHeader(logmiddleware.RequestIDHeader,
+		logmiddleware.RequestIDGeneratorFunc(func(*http.Request) string { return "generated" }))
+
+	mw := logmiddleware.NewSlog(exampleSlog(), logmiddleware.WithRequestIDFromRequest(gen))
+	handler := mw.Handler(http.NotFoundHandler())
+
+	for _, incoming := range []string{"from-proxy", "bad id\nlevel=ERROR"} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set(logmiddleware.RequestIDHeader, incoming)
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	// Output:
+	// level=DEBUG msg="HTTP response sent" requestId=from-proxy method=GET path=/ statusCode=404
+	// level=DEBUG msg="HTTP response sent" requestId=generated method=GET path=/ statusCode=404
+}
+
+func ExampleValidRequestID() {
+	for _, id := range []string{"0f8fad5b-d9cb-469f-a165-70867728950e", "a b", ""} {
+		fmt.Printf("%q %v\n", id, logmiddleware.ValidRequestID(id))
+	}
+	// Output:
+	// "0f8fad5b-d9cb-469f-a165-70867728950e" true
+	// "a b" false
+	// "" false
 }
