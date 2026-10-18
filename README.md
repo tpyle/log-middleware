@@ -131,20 +131,27 @@ done
 
 ### Releasing
 
-The core and both adapters are always released together with the same
-version number. Go versions each module by its own tags, so a release is three
-tags on the same commit:
+Go versions each module by its own tags, so each module is released only when
+its code changes. The adapters' version numbers can therefore lag behind the
+core's. An adapter's `require` of the core is a minimum, so users can always
+upgrade the core on its own. The `examples` module is never tagged.
 
-1. Set the new version in the `require` lines for this repository's modules in
-   `zerologmw/go.mod`, `logrusmw/go.mod` and `examples/go.mod`, and merge.
-2. Tag the merge commit and push the tags:
+1. Find which modules changed since their last release, for example
+   `git diff v3.1.0 HEAD -- zerologmw`. The core is the repository root,
+   excluding the adapter and examples directories.
+2. If an adapter needs a newer core than its `require` line names (for
+   example, because it uses a new core API), release the core first, then set
+   the new core version in that adapter's `go.mod` and merge.
+3. Tag the merge commit for each changed module and push the tags. Adapter
+   tags are prefixed with their directory:
    ```bash
-   V=vX.Y.Z
-   git tag -a $V -m $V && git tag -a zerologmw/$V -m $V && git tag -a logrusmw/$V -m $V
-   git push origin $V zerologmw/$V logrusmw/$V
+   git tag -a vX.Y.Z -m vX.Y.Z                      # core
+   git tag -a zerologmw/vX.Y.Z -m zerologmw/vX.Y.Z  # only if zerologmw changed
+   git tag -a logrusmw/vX.Y.Z -m logrusmw/vX.Y.Z    # only if logrusmw changed
+   git push origin <tags>
    ```
-3. Check from a scratch module that
-   `go get github.com/tpyle/log-middleware/zerologmw/v3@$V` resolves.
+4. Check from a scratch module that each new version resolves, for example
+   `go list -m github.com/tpyle/log-middleware/v3@vX.Y.Z`.
 
 ## License
 
