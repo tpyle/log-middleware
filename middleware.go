@@ -1,6 +1,6 @@
-// Package logmiddleware provides HTTP middleware that assigns every request a
-// unique ID, attaches a request-scoped logger to the request context, and logs
-// each completed response.
+// Package logmiddleware provides HTTP middleware that assigns every request an
+// ID (a random UUID by default), attaches a request-scoped logger to the
+// request context, and logs each completed response.
 //
 // The package depends only on the standard library and logs through
 // [log/slog] out of the box (see [NewSlog]). Adapters for third-party loggers
@@ -39,7 +39,7 @@ const (
 
 // RequestInfo describes an incoming request.
 type RequestInfo struct {
-	// RequestID is the unique ID assigned to the request.
+	// RequestID is the ID assigned to the request.
 	RequestID string
 	// Method is the HTTP method, e.g. "GET".
 	Method string
@@ -144,9 +144,16 @@ func ValidRequestID(id string) bool {
 // proxy or caller, and RequestIDGeneratorFunc([UUIDRequestID]) as fallback to
 // keep the default behavior for requests without one.
 //
+// Only reuse a header that your own infrastructure controls. If clients can
+// reach the server directly, or the proxy in front of it passes the header
+// through unchanged, any client can choose its request ID, including one
+// already used by another request. Have the proxy strip or overwrite the
+// header on incoming requests. Reused IDs are therefore not guaranteed to be
+// unique.
+//
 // It panics if fallback is nil.
 func RequestIDFromHeader(header string, fallback RequestIDGenerator) RequestIDGenerator {
-	if f, ok := fallback.(RequestIDGeneratorFunc); fallback == nil || (ok && f == nil) {
+	if isNilGenerator(fallback) {
 		panic("logmiddleware: nil fallback RequestIDGenerator")
 	}
 	return RequestIDGeneratorFunc(func(r *http.Request) string {
@@ -159,6 +166,12 @@ func RequestIDFromHeader(header string, fallback RequestIDGenerator) RequestIDGe
 
 // Option configures a [LogMiddleware].
 type Option func(*LogMiddleware)
+
+// isNilGenerator reports whether g is nil or a nil [RequestIDGeneratorFunc].
+func isNilGenerator(g RequestIDGenerator) bool {
+	f, ok := g.(RequestIDGeneratorFunc)
+	return g == nil || (ok && f == nil)
+}
 
 // WithRequestIDGenerator replaces the default random UUID request ID generator
 // with one that does not need the request. The function must be safe for
@@ -176,13 +189,13 @@ func WithRequestIDGenerator(generate func() string) Option {
 // WithRequestIDFromRequest replaces the default random UUID request ID
 // generator with g, which is called once per request with the incoming
 // request. A nil g, including a nil [RequestIDGeneratorFunc], keeps the
-// current generator.
+// current generator. A non-nil interface holding some other nil value, such
+// as a nil pointer, is not detected and is called on every request.
 func WithRequestIDFromRequest(g RequestIDGenerator) Option {
 	return func(lm *LogMiddleware) {
-		if f, ok := g.(RequestIDGeneratorFunc); g == nil || (ok && f == nil) {
-			return
+		if !isNilGenerator(g) {
+			lm.requestID = g
 		}
-		lm.requestID = g
 	}
 }
 

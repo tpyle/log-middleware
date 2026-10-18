@@ -3,6 +3,9 @@
 // generates a random UUID. Invalid incoming IDs (for example, ones containing
 // spaces or newlines) are replaced rather than logged.
 //
+// Only reuse the header behind a proxy that strips or overwrites any value sent
+// by clients. Otherwise clients can choose their own request IDs.
+//
 //	go run ./examples/requestid
 //	curl -i localhost:8080/hello
 //	curl -i -H 'X-Request-Id: trace-abc123' localhost:8080/hello

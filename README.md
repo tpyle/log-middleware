@@ -1,6 +1,6 @@
 # Go Log Middleware v3
 
-HTTP middleware for Go that gives every request a unique ID, attaches a
+HTTP middleware for Go that gives every request an ID, attaches a
 request-scoped logger to the request context, and logs each response with its
 status code and duration.
 
@@ -87,8 +87,9 @@ id := logmiddleware.GetRequestIdFromRequest(r)   // or GetRequestIdFromContext(c
 ```
 
 The ID is also returned to the client in the `X-Request-Id` response header.
-IDs are random UUIDs by default. To reuse a valid incoming `X-Request-Id` from
-an upstream proxy:
+IDs are random UUIDs by default. To reuse a valid incoming `X-Request-Id` set
+by a proxy you control (the proxy must strip or overwrite any value sent by
+clients, or clients can choose their own IDs):
 
 ```go
 ids := logmiddleware.RequestIDFromHeader(logmiddleware.RequestIDHeader,

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 
 	logmiddleware "github.com/tpyle/log-middleware/v3"
 )
@@ -86,17 +87,20 @@ func ExampleNewContextHandler() {
 }
 
 func ExampleWithRequestIDFromRequest() {
-	// Use the first character of the path as the ID. Any function of the
-	// request works; see RequestIDFromHeader for reusing an incoming header.
-	byPath := logmiddleware.RequestIDGeneratorFunc(func(r *http.Request) string {
-		return "path-" + r.URL.Path[1:2]
+	// Prefix a random UUID with the HTTP method. Any function of the request
+	// works; see RequestIDFromHeader for reusing an incoming header.
+	byMethod := logmiddleware.RequestIDGeneratorFunc(func(r *http.Request) string {
+		return strings.ToLower(r.Method) + "-" + logmiddleware.UUIDRequestID(r)
 	})
 
-	mw := logmiddleware.NewSlog(exampleSlog(), logmiddleware.WithRequestIDFromRequest(byPath))
+	mw := logmiddleware.NewSlog(slog.New(slog.DiscardHandler), logmiddleware.WithRequestIDFromRequest(byMethod))
 	handler := mw.Handler(http.NotFoundHandler())
-	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/abc", nil))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	fmt.Println(strings.HasPrefix(rec.Header().Get(logmiddleware.RequestIDHeader), "get-"))
 	// Output:
-	// level=DEBUG msg="HTTP response sent" requestId=path-a method=GET path=/abc statusCode=404
+	// true
 }
 
 func ExampleRequestIDFromHeader() {

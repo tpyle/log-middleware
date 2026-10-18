@@ -2,7 +2,7 @@
 
 `github.com/tpyle/log-middleware/v3` is HTTP middleware for Go that:
 
-- assigns every request a unique ID (a random UUID by default),
+- assigns every request an ID (a random UUID by default, or your own generator),
 - returns that ID in the `X-Request-Id` response header,
 - stores the ID and a request-scoped logger in the request context, and
 - logs every completed response at debug level with its status code and duration.

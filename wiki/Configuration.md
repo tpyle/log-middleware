@@ -11,7 +11,8 @@ All constructors (`New`, `NewSlog`, `zerologmw.New`, `logrusmw.New`) accept
 | `WithRequestIDFromRequest(RequestIDGenerator)` | Replaces the default generator with one that receives the incoming `*http.Request`. Must be safe for concurrent use. |
 | `WithClock(func() time.Time)` | Replaces `time.Now` for measuring durations. Mainly for tests. |
 
-Passing `nil` to any option keeps the default. If more than one request ID
+Passing `nil` to any option leaves that setting unchanged: the default, or
+whatever an earlier option set. If more than one request ID
 option is given, the last one wins.
 
 ## Custom request IDs
@@ -43,6 +44,15 @@ It uses the header's first value if it passes `ValidRequestID`, and calls
 the fallback otherwise. The fallback is required, and passing `nil` panics:
 you choose what happens when there is no usable ID. Use any header name, such
 as `X-Correlation-Id`.
+
+Only reuse a header that your own infrastructure controls. If clients can
+reach the server directly, or your proxy passes the header through unchanged,
+any client can pick its own request ID, including one already used by another
+request, which muddles log correlation. Configure the proxy to strip or
+overwrite the header on incoming requests. For example, in nginx:
+`proxy_set_header X-Request-Id $request_id;`.
+
+IDs reused from a header are not guaranteed to be unique.
 
 ### Validation
 
