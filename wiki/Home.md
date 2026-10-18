@@ -8,9 +8,9 @@
 - logs every completed response at debug level with its status code and duration.
 
 The core module has no dependencies outside the standard library and logs with
-`log/slog`. zerolog and logrus are supported through adapter modules that are
-released together with the core under the same version number. zerolog and logrus show up in your `go.mod`, binary and
-SBOM only if you add the adapter.
+`log/slog`. zerolog and logrus are supported through adapter modules, which
+are versioned separately from the core. zerolog and logrus show up in your
+`go.mod`, binary and SBOM only if you add the adapter.
 
 | Logger | Import | Constructor | Get the logger in a handler |
 |--------|--------|-------------|-----------------------------|

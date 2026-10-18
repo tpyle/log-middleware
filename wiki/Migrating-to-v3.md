@@ -50,9 +50,10 @@ go get github.com/tpyle/log-middleware/v3@v3.1.0
 go mod tidy
 ```
 
-The core import path, `github.com/tpyle/log-middleware/v3`, is unchanged. The
-core and both adapters share the same version number. Use matching versions,
-for example v3.1.0 for all three.
+The core import path, `github.com/tpyle/log-middleware/v3`, is unchanged.
+Adapters are released only when they change, so their latest version can be
+lower than the core's. Any adapter v3.1.0 or later works with any later v3
+core.
 
 The core module no longer depends on `github.com/google/uuid`. Request IDs
 are still random version 4 UUIDs, now generated with the standard library's
